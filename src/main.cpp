@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <ch32v003fun.h>
 
 const int pin = C4;
 
@@ -70,9 +71,41 @@ void neoPixelWrite(int pin, int r, int g, int b){
 }
 
 void setup(){
+  SETUP_SYSTICK_HCLK;
   pinMode(pin, OUTPUT);
-  // digitalWrite(pin, HIGH);
-  GPIOSpeed_TypeDef speed = GPIO_Speed_50MHz;
+}
+
+static uint8_t gpioForPin(pin_size_t pin){
+  if(pin < 2){
+    return 0;
+  }else if (pin < 10){
+    return 2;
+  }else{
+    return 3;
+  }
+}
+
+static GPIO_TypeDef* gpioRegister(uint8_t gpio){
+  switch(gpio){
+    case 0:
+      return GPIOA;
+    case 2:
+      return GPIOC;
+    default:
+      return GPIOD;
+  }
+}
+
+static uint8_t gpioPin(uint8_t gpio, pin_size_t pin){
+  switch (gpio)
+  {
+  case 0:
+    return pin;
+  case 2:
+    return pin-2;
+  default:
+    return pin-10;
+  }
 }
 
 void loop(){
@@ -80,11 +113,21 @@ void loop(){
   //   neoPixelWrite(pin, 0, 0, i);
   //   delay(10);
   // }
-  digitalWrite(pin, HIGH);
-  for (int i = 0; i < 8; i++){
-    NOP;
-  }
+  // neopixel_write(GPIOC, GPIO_Pin_4, colorData, LED_NUM);
+  uint8_t gpio = gpioForPin(pin);
+  GPIO_TypeDef* port = gpioRegister(gpio);
+  uint8_t p = gpioPin(gpio, pin);
 
-  digitalWrite(pin, LOW);
-  NOP;
+  port->BSHR = 1 << p;
+  _NOP();
+  port->BCR = 1 << p;
+  _NOP();
+  port->BSHR = 1 << p;
+  _NOP();
+  port->BCR = 1 << p;
+  _NOP();
+  port->BSHR = 1 << p;
+  _NOP();
+  port->BCR = 1 << p;
+  _NOP();
 }
