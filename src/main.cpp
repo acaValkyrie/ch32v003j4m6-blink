@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include <ch32v003fun.h>
 
 const int pin = C4;
 
@@ -79,7 +78,7 @@ void makeCommand(int* command, int r, int g, int b){
 #define T0L 1.0
 #define T1L 0.65
 
-#define code_0(port, p) \
+void code_0(GPIO_TypeDef* port, uint8_t p) {
   port->BSHR = 1 << p; \
   for(int i = 0; i < 8; i++) _NOP(); \
   for(int i = 0; i < 7; i++) _NOP(); \
@@ -92,8 +91,9 @@ void makeCommand(int* command, int r, int g, int b){
   for(int i = 0; i < 8; i++) _NOP(); \
   for(int i = 0; i < 8; i++) _NOP(); \
   for(int i = 0; i < 6; i++) _NOP();
+}
 
-#define code_1(port, p) \
+void code_1(GPIO_TypeDef* port, uint8_t p) {
   port->BSHR = 1 << p; \
   for(int i = 0; i < 8; i++) _NOP(); \
   for(int i = 0; i < 8; i++) _NOP(); \
@@ -105,6 +105,7 @@ void makeCommand(int* command, int r, int g, int b){
   for(int i = 0; i < 8; i++) _NOP(); \
   port->BCR = 1 << p; \
   for(int i = 0; i < 1; i++) _NOP(); 
+}
 
 #define code_IO(port, p, value) \
   if(value == 0){ code_0(port, p); }else if(value == 1){ code_1(port, p);}
@@ -162,14 +163,14 @@ void sendCommand(int pin, int* command, unsigned int length){
   code_IO(port, p, v22);
   code_IO(port, p, v23);
 
-  code_IO(port, p, 0);
+  port->BCR = 1 << p;
+  for(int i = 0; i < 8; i++) _NOP();
 }
 
 void neoPixelWrite(int pin, int r, int g, int b){
   int command[24];
   makeCommand(command, r, g, b);
   sendCommand(pin, command, 24);
-  
 }
 
 void setup(){
@@ -177,7 +178,30 @@ void setup(){
   pinMode(pin, OUTPUT);
 }
 
+namespace mymath{
+  // ch32v003 does not supoport, including sin function, some math libraries.
+  // https://community.platformio.org/t/ch32v-arduino-support-issue/38128/9
+  float sin(float x){
+    if (x < -3.14159){
+      x += 6.283185;
+    }else if (x > 3.14159){
+      x -= 6.283185;
+    }
+    // Maclaurin 7th order approximation of the sin function
+    return x - x*x*x/6.0 + x*x*x*x*x/120.0 - x*x*x*x*x*x*x/5040.0;
+  }
+}
+
 void loop(){
-  neoPixelWrite(pin, 10,10,10);
-  delay(100);
+  for(int t = -180; t < 180; t++){
+    float a = 5;
+    int r = (int)(a * (1 + mymath::sin(3.14159 * (t + 0) / 180.0)));
+    int g = (int)(a * (1 + mymath::sin(3.14159 * (t + 120) / 180.0)));
+    int b = (int)(a * (1 + mymath::sin(3.14159 * (t + 240) / 180.0)));
+    neoPixelWrite(pin, r, g, b);
+    neoPixelWrite(pin, g, b, r);
+    neoPixelWrite(pin, b, r, g);
+    
+    delay(100);
+  }
 }
